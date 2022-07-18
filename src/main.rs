@@ -15,9 +15,9 @@ struct HuffmanTree {
 
 impl HuffmanTree {
     fn build_tree(file: &fs::File) -> HuffmanTree {
-        let mut frequency_table: Vec<u32> = vec![0; 255];
+        let mut frequency_table: Vec<u32> = vec![0; 256];
 
-        // read file byte by byte and count u8 frequency
+        // read file byte by byte and count byte frequency
         for byte in file.bytes() {
             let index: usize = byte.unwrap().into();
             frequency_table[index] += 1;
@@ -72,7 +72,7 @@ struct HuffmanCode {
 }
 
 impl std::fmt::Display for HuffmanCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut symbols = Vec::from_iter(self.code.iter());
         symbols.sort();
         println!("Symbol\t| Code Word");
@@ -94,9 +94,8 @@ impl HuffmanCode {
         // Entries in fringe matches the tuple (node, code_word)
         while node_fringe.len() != 0 {
             if let Some(fringe_entry) = node_fringe.pop() {
-
                 let (node, mut code_word) = fringe_entry;
-                
+
                 // If current node has children, push them to the fringe
                 if let (Some(left_child), Some(right_child)) =
                     (node.left_child.as_ref(), node.right_child.as_ref())
@@ -107,7 +106,6 @@ impl HuffmanCode {
                     code_word.push('0');
                     node_fringe.push((left_child, code_word));
                 }
-                
                 // If current node has no children, then add a code word to the code
                 else if let (None, None) = (node.left_child.as_ref(), node.right_child.as_ref()) {
                     if let Some(symbol) = node.symbol {
@@ -119,23 +117,56 @@ impl HuffmanCode {
         HuffmanCode { code: code }
     }
 
-    fn _encode(self, input: &String) {
-        for character in input.bytes() {
-            let encoded_char = self.code.get(&character);
-            if let Some(encoded_char) = encoded_char {
-                print!("{}", encoded_char)
-            }
+    fn encode(input: &str) -> u8 {
+        let mut output: u8 = 0;
+        for character in input.chars() {
+            output = match character {
+                '0' => output << 1,
+                '1' => (output << 1) | 1,
+                _default => panic!(),
+            };
         }
+        print!("");
+        output
     }
 
     fn _decode() {}
 
-    fn compress() {
-        // TODO: implement file compression with huffman compression
+    fn compress(self, output_file: &mut File, input_filename: &String) -> io::Result<()> {
+        let input_file = match fs::File::open(input_filename) {
+            Ok(file) => file,
+            Err(e) => return Err(e),
+        };
+
+        // contents
+        let mut output_buffer: String = String::from("");
+        for byte in input_file.bytes() {
+            let symbol: u8 = byte.unwrap();
+            let code_word = self.code.get(&symbol).unwrap();
+            output_buffer.push_str(code_word);
+
+            while output_buffer.len() >= 8 {
+                let output_symbol = HuffmanCode::encode(&output_buffer[0..8]);
+                output_file.write(&[output_symbol]);
+                output_buffer = output_buffer[8..].to_string();
+            }
+        }
+
+        // remaining bits
+        if output_buffer.len() > 0 {
+            // pad the remaining bits
+            for _i in 0..(8 - output_buffer.len()) {
+                output_buffer.push('0');
+            }
+            let output_symbol = HuffmanCode::encode(&output_buffer[0..8]);
+            output_file.write(&[output_symbol]);
+        }
+
+        Ok(())
     }
 
     fn decompress() {
-        // TODO: implement file decompression with huffman compression
+        // TODO: implement file decompression
     }
 }
 
@@ -168,18 +199,40 @@ impl PartialEq for HuffmanTreeNode {
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
 
+    let now = std::time::Instant::now();
+
     let filename = &args[1];
 
-    let file = match fs::File::open(filename) {
+    let input_file = match fs::File::open(filename) {
         Ok(file) => file,
         Err(e) => return Err(e),
     };
 
-    let huffman_tree = HuffmanTree::build_tree(&file);
+    let input_file_size: f64 = input_file.metadata().unwrap().len() as f64;
+    println!("Input file size = {} bytes", input_file_size);
+
+    let huffman_tree = HuffmanTree::build_tree(&input_file);
 
     let huffman_code = HuffmanCode::from_tree(&huffman_tree);
 
-    print!("{}", huffman_code);
+    let compressed_file_extension = ".hfm";
+    let output_filename = format!("{}{}", filename, compressed_file_extension);
+
+    let mut output_file: File = match File::create(&output_filename) {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+
+    huffman_code.compress(&mut output_file, &filename);
+
+    let output_file_size: f64 = output_file.metadata().unwrap().len() as f64;
+    println!("Output file size = {} bytes", output_file_size);
+
+    let file_size_reduction = ((1.0 - output_file_size / input_file_size) * 100.0);
+    println!("File size reduction = {}%", file_size_reduction);
+
+    let elapsed = now.elapsed().as_millis();
+    println!("Compression took {} millis", elapsed);
 
     Ok(())
 }
