@@ -7,7 +7,16 @@ pub mod argparser {
     }
 
     fn print_help_message() {
-        println!("Something something help");
+        let help_msg = format!(
+            "{} {}\n{}\n{}\n{}\n{}",
+            "usage: rust_huffman_compression -i <input filename>",
+            "[-o <output filename>] [-v] [-h]",
+            "optional arguments:",
+            "  -o, --output\t\toutput filename",
+            "  -v, --verbose\t\tincrease verbosity",
+            "  -h, --help\t\tprint help message and exit",
+        );
+        println!("{}", help_msg);
         std::process::exit(0);
     }
 
