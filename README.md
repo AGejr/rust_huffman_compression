@@ -1,5 +1,5 @@
 # rust_huffman_compression
-A cli tool written in rust to compress files using [Huffman Compression](https://en.wikipedia.org/wiki/Huffman_coding)
+A cli tool written in rust to compress files using [Huffman Compression](https://en.wikipedia.org/wiki/Huffman_coding#Compression)
 ```
 usage: 
   rust_huffman_compression --interactive
