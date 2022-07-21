@@ -9,9 +9,10 @@ pub mod huffman_code {
 
     mod huffman_tree {
         use std::cmp::Ordering;
-        use std::collections::BinaryHeap;
+        use std::collections::{BinaryHeap, HashMap};
         use std::fs::File;
         use std::io::Read;
+        use std::ops::Deref;
 
         #[derive(Debug, Eq)]
         pub(crate) struct HuffmanTreeNode {
@@ -39,7 +40,7 @@ pub mod huffman_code {
             }
         }
 
-        pub(crate) fn build_huffman_tree(file: &File) -> self::HuffmanTreeNode {
+        pub(crate) fn frequency_table_from_file(file: &File) -> Vec<u32> {
             let mut frequency_table: Vec<u32> = vec![0; 256];
 
             if file.metadata().unwrap().len() == 0 {
@@ -52,6 +53,39 @@ pub mod huffman_code {
                 frequency_table[index] += 1;
             }
 
+            frequency_table
+        }
+
+        pub(crate) fn frequency_table_from_text_file(file: &mut File) -> Vec<u32> {
+            let mut frequency_table: Vec<u32> = vec![0; 256];
+
+            if file.metadata().unwrap().len() == 0 {
+                panic!("Input file must not be empty");
+            }
+
+            let mut file_contents = String::new();
+            file.read_to_string(&mut file_contents).unwrap();
+
+            for character in file_contents.chars() {
+                let index: usize = character as u8 as usize;
+                frequency_table[index] += 1;
+            }
+
+            frequency_table
+        }
+
+        pub(crate) fn frequency_table_from_string(string: &String) -> Vec<u32> {
+            let mut frequency_table: Vec<u32> = vec![0; 256];
+
+            for character in string.chars() {
+                let index: usize = character as usize;
+                frequency_table[index] += 1;
+            }
+
+            frequency_table
+        }
+
+        fn build_min_heap(frequency_table: &Vec<u32>) -> BinaryHeap<HuffmanTreeNode> {
             // create min heap
             let mut Q = BinaryHeap::new();
 
@@ -68,6 +102,26 @@ pub mod huffman_code {
                 };
                 Q.push(node);
             }
+            Q
+        }
+
+        pub(crate) fn print_frequency_table(frequency_table: &Vec<u32>, as_char: bool, verbose: bool) {
+            println!("Symbol\t| Frequency");
+            println!("-------------------");
+            for (index, element) in frequency_table.into_iter().enumerate() {
+                if !verbose && *element == 0 {
+                    continue;
+                }
+                if as_char && (index as u8 as char).is_alphanumeric() {
+                    println!("{}\t| {}", index as u8 as char, element);
+                } else {
+                    println!("{}\t| {}", index, element);
+                }
+            }
+        }
+
+        pub(crate) fn build_huffman_tree(frequency_table: &Vec<u32>) -> self::HuffmanTreeNode {
+            let mut Q = self::build_min_heap(&frequency_table);
 
             // create huffman tree in a bottom up manner by merging entries with lowest frequency |Q| - 1 times
             for _i in 0..Q.len() - 1 {
@@ -100,13 +154,17 @@ pub mod huffman_code {
         output
     }
 
-    fn print_huffman_code(huffman_code: &HashMap<u8, String>) {
+    fn print_huffman_code(huffman_code: &HashMap<u8, String>, as_char: bool) {
         let mut symbols = Vec::from_iter(huffman_code.iter());
         symbols.sort();
         println!("Symbol\t| Code Word");
-        println!("------------------");
+        println!("-------------------");
         for (symbol, code_word) in symbols {
-            println!("{symbol}\t| {code_word}");
+            if as_char && (*symbol as u8 as char).is_alphanumeric() {
+                println!("{}\t| {}", *symbol as char, code_word);
+            } else {
+                println!("{}\t| {}", symbol, code_word);
+            }
         }
     }
 
@@ -144,7 +202,33 @@ pub mod huffman_code {
         code
     }
 
-    pub fn compress_file(input_filename: &String, output_filename: &String, verbose: bool) {
+    pub fn compress_string(characters: &String, string_to_encode: &String) {
+        let frequency_table = self::huffman_tree::frequency_table_from_string(&characters);
+        println!("");
+        self::huffman_tree::print_frequency_table(&frequency_table, true, false);
+        let huffman_tree = self::huffman_tree::build_huffman_tree(&frequency_table);
+        let huffman_code = self::generate_huffman_code(&huffman_tree);
+        println!("");
+        self::print_huffman_code(&huffman_code, true);
+        println!("");
+
+        // contents
+        let mut output_buffer: String = String::from("");
+        for character in string_to_encode.chars() {
+            let code_word = match huffman_code.get(&(character as u8)) {
+                Some(code_word) => code_word,
+                None => panic!("Cannot encode a char which is not represented in the code"),
+            };
+            output_buffer.push_str(code_word);
+        }
+
+        if !string_to_encode.len() == 0 {
+            println!("Input string:\t{}", string_to_encode);
+            println!("Encoded string:\t{}\n", output_buffer);
+        }
+    }
+
+    pub fn compress_file(input_filename: &String, output_filename: &String, binary: bool, verbose: bool) {
         let now = std::time::Instant::now();
 
         let mut input_file = File::open(input_filename).unwrap();
@@ -153,29 +237,53 @@ pub mod huffman_code {
         let input_file_size: f64 = input_file.metadata().unwrap().len() as f64;
         println!("Input file size = {} bytes", input_file_size);
 
-        let huffman_tree = self::huffman_tree::build_huffman_tree(&input_file);
+        let mut frequency_table = match binary {
+            true => self::huffman_tree::frequency_table_from_file(&input_file),
+            false => self::huffman_tree::frequency_table_from_text_file(&mut input_file),
+        };
+        let huffman_tree = self::huffman_tree::build_huffman_tree(&frequency_table);
         let huffman_code = self::generate_huffman_code(&huffman_tree);
 
         if verbose {
-            self::print_huffman_code(&huffman_code)
+            println!("");
+            self::huffman_tree::print_frequency_table(&frequency_table, !binary, false);
+            println!("");
+            self::print_huffman_code(&huffman_code, !binary);
+            println!("");
         }
 
         input_file = File::open(input_filename).unwrap();
 
-        // contents
         let mut output_buffer: String = String::from("");
-        for byte in input_file.bytes() {
-            let symbol: u8 = byte.unwrap();
-            let code_word = huffman_code.get(&symbol).unwrap();
-            output_buffer.push_str(code_word);
+        // TODO: improve this lol
+        if !binary {
+            let mut file_contents = String::new();
+            input_file.read_to_string(&mut file_contents).unwrap();
+            for character in file_contents.chars() {
+                let symbol: u8 = character as u8;
+                let code_word = huffman_code.get(&symbol).unwrap();
+                output_buffer.push_str(code_word);
+    
+                while output_buffer.len() >= 8 {
+                    let output_symbol = self::encode(&output_buffer[0..8]);
+                    output_file.write(&[output_symbol]).unwrap();
+                    output_buffer = output_buffer[8..].to_string();
+                }
+            }
+        } else {
+            for byte in input_file.bytes() {
+                let symbol: u8 = byte.unwrap() as u8;
+                let code_word = huffman_code.get(&symbol).unwrap();
+                output_buffer.push_str(code_word);
 
-            while output_buffer.len() >= 8 {
-                let output_symbol = self::encode(&output_buffer[0..8]);
-                output_file.write(&[output_symbol]).unwrap();
-                output_buffer = output_buffer[8..].to_string();
+                while output_buffer.len() >= 8 {
+                    let output_symbol = self::encode(&output_buffer[0..8]);
+                    output_file.write(&[output_symbol]).unwrap();
+                    output_buffer = output_buffer[8..].to_string();
+                }
             }
         }
-
+        
         // remaining bits
         if output_buffer.len() > 0 {
             // pad the remaining bits
