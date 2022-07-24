@@ -10,14 +10,15 @@ pub mod argparser {
 
     fn print_help_message() {
         let help_msg = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
-            "usage: ",
+            "{}\n\n{}\n{}\n{}\n\n{}\n{}\n{}\n\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            "A CLI tool which uses Huffman compression to compress files",
+            "USAGE: ",
             "  rust_huffman_compression --interactive",
-            "  rust_huffman_compression -i <input filename> [optional args]",
-            "required",
+            "  rust_huffman_compression -i <input filename> [OPTIONS]",
+            "REQUIRED",
             "  --interactive\t\tuse cli input",
             "  -i, --input\t\tuse file input",
-            "optional args:",
+            "OPTIONS",
             "  -o, --output\t\toutput filename",
             "  -b, --binary\t\tread input file as binary file",
             "\t\t\tthis option should be used when compressing large files",
