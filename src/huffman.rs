@@ -222,7 +222,7 @@ pub mod huffman_code {
             output_buffer.push_str(code_word);
         }
 
-        if !string_to_encode.len() == 0 {
+        if !(string_to_encode.len() == 0) {
             println!("Input string:\t{}", string_to_encode);
             println!("Encoded string:\t{}\n", output_buffer);
         }
